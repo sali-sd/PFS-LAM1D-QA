@@ -1,0 +1,21 @@
+# Generated QA outputs from 1dQA.py
+*_all_lam1d.csv
+*_all_lam1d_catalog_matched.csv
+*_summary_stats.txt
+*_galaxy_lam1d_vs_catalog_specz_comparison.png
+*_qso_lam1d_vs_catalog_specz_comparison.png
+*_unmatched_spectra.pdf
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+env/
