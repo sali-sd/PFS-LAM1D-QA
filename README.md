@@ -17,7 +17,7 @@ It then:
 
 1. Merges all catid / obj_group directories into a single combined table.
 2. Cross-matches with a reference spec-z catalog (via sky-coordinate matching).
-3. Computes redshift match rates (`|Δz| ≤ z_limit`) and classification match rates.
+3. Computes redshift match rates (`|Δz| ≤ z_limit_gal` for galaxies, `|Δz| ≤ z_limit_qso` for QSOs) and classification match rates.
 4. Selects representative *unmatched* objects using KMeans clustering.
 5. Plots spectra for those objects with a main panel and four emission-line zoom panels.
 
@@ -47,6 +47,9 @@ run_name   = "run26"                    # run name (e.g. S25A, run26)
 rerun      = "20260430"                 # rerun date tag
 lam1d_output_dir = "bmn_400_930_output" # LAM1D output directory name
 specz_catalog_path = "/path/to/catalog_specz_merged.csv"
+matching_threshold_arcsec = 1.0         # sky cross-match radius (arcsec)
+z_limit_gal = 0.01                      # max |Δz| for a GALAXY redshift match
+z_limit_qso = 0.02                      # max |Δz| for a QSO redshift match
 drp2d_dir  = "/path/to/datastore"      # Butler repository for the 2D DRP
 ```
 
