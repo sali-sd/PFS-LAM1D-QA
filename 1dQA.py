@@ -20,7 +20,8 @@ rerun      = "20260430"                                # rerun date tag
 lam1d_output_dir = "bmn_400_930_output"                      # exact LAM1D output directory name, such that: {lam1d_dir}/{run_name}/{rerun}/{lam1d_output_dir}
 specz_catalog_path = "/data_pde01/work/lizm/packages/catalog_specz_merged.csv"  # reference spec-z catalog
 matching_threshold_arcsec = 1.0  # max separation for catalog cross-matching (arcsec)
-z_limit = 0.02                   # max |z_lam1d - z_catalog| to count as a redshift match
+z_limit_gal = 0.01               # max |z_lam1d - z_catalog| for GALAXY redshift match
+z_limit_qso = 0.02               # max |z_lam1d - z_catalog| for QSO redshift match
 drp2d_dir   = "/lfs_pfs/Subaru/PFS/data/datastore_20260226"  # Butler repository location for corrsponding 2D data (2D DRP datastore)
 
 # --- Step 2: Derived parameters ---
@@ -31,11 +32,11 @@ combination = f"{lam1d_output_dir.split('_')[0]}_{run_name}"
 repo        = drp2d_dir
 pdf_filename = f"{run_tag}_unmatched_spectra.pdf"
 N_UNMATCHED_SPECTRA = 10
-MEDIAN_FILTER_SIZE  = 2
+MEDIAN_FILTER_SIZE  = 1
 
 class_config = [
-    ("GALAXY", "redshift_gal"),
-    ("QSO",    "redshift_qso"),
+    ("GALAXY", "redshift_gal", z_limit_gal),
+    ("QSO",    "redshift_qso", z_limit_qso),
 ]
 
 # --- Step 3: Validate Butler repo and collections ---
@@ -168,7 +169,7 @@ if all_final_dfs:
     print(f"Matched {len(df_matched)} objects with redshift catalog, saved to {run_tag}_all_lam1d_catalog_matched.csv")
 
     summary_lines = []
-    for class_name, redshift_col in class_config:
+    for class_name, redshift_col, z_limit in class_config:
         df_class = df_matched[df_matched['class'].str.upper() == class_name]
         n_total  = len(df_class)
         if n_total == 0:
@@ -188,7 +189,7 @@ if all_final_dfs:
             f.write(line + "\n")
     print(f"Summary of {run_tag} statistics saved to {run_tag}_summary_stats.txt")
 
-    def plot_comparison(df, class_name, redshift_col, plot_filename):
+    def plot_comparison(df, class_name, redshift_col, z_limit, plot_filename):
         diff            = df[redshift_col] - df["z"]
         matched         = abs(diff) <= z_limit
         df_matched_plot = df[matched]
@@ -227,9 +228,9 @@ if all_final_dfs:
         plt.savefig(plot_filename, dpi=200)
         plt.clf()
 
-    plot_comparison(df_matched[df_matched['class'].str.upper() == 'GALAXY'], "GALAXY", "redshift_gal",
+    plot_comparison(df_matched[df_matched['class'].str.upper() == 'GALAXY'], "GALAXY", "redshift_gal", z_limit_gal,
                     f"{run_tag}_galaxy_lam1d_vs_catalog_specz_comparison.png")
-    plot_comparison(df_matched[df_matched['class'].str.upper() == 'QSO'], "QSO", "redshift_qso",
+    plot_comparison(df_matched[df_matched['class'].str.upper() == 'QSO'], "QSO", "redshift_qso", z_limit_qso,
                     f"{run_tag}_qso_lam1d_vs_catalog_specz_comparison.png")
 
 
@@ -417,7 +418,7 @@ if all_final_dfs:
     butler = Butler(repo, collections=collections)
 
     with PdfPages(pdf_filename) as pdf:
-        for class_name, redshift_col in class_config:
+        for class_name, redshift_col, z_limit in class_config:
             df_class_all = df_matched[df_matched['class'].str.upper() == class_name]
             df_unmatched = df_class_all[(df_class_all[redshift_col] - df_class_all['z']).abs() > z_limit].copy()
 
