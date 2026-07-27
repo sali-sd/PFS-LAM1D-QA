@@ -17,7 +17,7 @@ from pfs.datamodel import PfsCoZCandidates
 lam1d_dir  = "/lfs_pfs/Subaru/PFS/1d/lam1d"          # root directory for LAM1D outputs
 run_name   = "run26"                                   # run name (e.g. S25A, run26)
 rerun      = "20260430"                                # rerun date tag
-lam1d_output_dir = "bmn_400_930_output"                      # exact LAM1D output directory name, such that: {lam1d_dir}/{run_name}/{rerun}/{lam1d_output_dir}
+lam1d_output_dir = "brn_400_960_output"                      # exact LAM1D output directory name, such that: {lam1d_dir}/{run_name}/{rerun}/{lam1d_output_dir}
 specz_catalog_path = "/data_pde01/work/lizm/packages/catalog_specz_merged.csv"  # reference spec-z catalog
 matching_threshold_arcsec = 1.0  # max separation for catalog cross-matching (arcsec)
 z_limit_gal = 0.01               # max |z_lam1d - z_catalog| for GALAXY redshift match
