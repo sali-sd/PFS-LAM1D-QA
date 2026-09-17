@@ -2,6 +2,7 @@
 *_all_lam1d.csv
 *_all_lam1d_catalog_matched.csv
 *_summary_stats.txt
+*_QA_plots.pdf
 *_galaxy_lam1d_vs_catalog_specz_comparison.png
 *_qso_lam1d_vs_catalog_specz_comparison.png
 *_unmatched_spectra.pdf

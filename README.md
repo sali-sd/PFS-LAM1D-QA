@@ -18,8 +18,8 @@ It then:
 1. Merges all catid / obj_group directories into a single combined table.
 2. Cross-matches with a reference spec-z catalog (via sky-coordinate matching).
 3. Computes redshift match rates (`|Δz| ≤ z_limit_gal` for galaxies, `|Δz| ≤ z_limit_qso` for QSOs) and classification match rates.
-4. Selects representative *unmatched* objects using KMeans clustering.
-5. Plots spectra for those objects with a main panel and four emission-line zoom panels.
+4. Writes a QA PDF: class-matched LAM1D vs catalog spec-z, and Δz vs r-band magnitude.
+5. Selects representative *unmatched* objects using KMeans clustering and plots their spectra (main panel plus four emission-line zooms).
 
 ## Outputs
 
@@ -28,8 +28,7 @@ It then:
 | `{run_tag}_all_lam1d.csv` | All objects from all catid/obj_group directories |
 | `{run_tag}_all_lam1d_catalog_matched.csv` | Subset cross-matched with the reference catalog |
 | `{run_tag}_summary_stats.txt` | Object counts and redshift/classification match rates |
-| `{run_tag}_galaxy_lam1d_vs_catalog_specz_comparison.png` | LAM1D vs catalog spec-z scatter (GALAXY) |
-| `{run_tag}_qso_lam1d_vs_catalog_specz_comparison.png` | LAM1D vs catalog spec-z scatter (QSO) |
+| `{run_tag}_QA_plots.pdf` | Spec-z comparison and Δz vs mag plots (GALAXY and QSO) |
 | `{run_tag}_unmatched_spectra.pdf` | Spectrum + zoom panels for representative unmatched objects |
 
 ## Requirements
@@ -46,7 +45,7 @@ lam1d_dir  = "/path/to/lam1d"          # root directory for LAM1D outputs
 run_name   = "run26"                    # run name (e.g. S25A, run26)
 rerun      = "20260430"                 # rerun date tag
 lam1d_output_dir = "bmn_400_930_output" # LAM1D output directory name
-specz_catalog_path = "/path/to/catalog_specz_merged.csv"
+specz_catalog_path = "/path/to/catalog_specz_master.csv"
 matching_threshold_arcsec = 1.0         # sky cross-match radius (arcsec)
 z_limit_gal = 0.01                      # max |Δz| for a GALAXY redshift match
 z_limit_qso = 0.02                      # max |Δz| for a QSO redshift match

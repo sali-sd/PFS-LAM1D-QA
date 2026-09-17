@@ -15,10 +15,10 @@ from pfs.datamodel import PfsCoZCandidates
 
 # --- Step 1: User-defined parameters ---
 lam1d_dir  = "/lfs_pfs/Subaru/PFS/1d/lam1d"          # root directory for LAM1D outputs
-run_name   = "run26"                                   # run name (e.g. S25A, run26)
-rerun      = "20260430"                                # rerun date tag
-lam1d_output_dir = "brn_400_960_output"                      # exact LAM1D output directory name, such that: {lam1d_dir}/{run_name}/{rerun}/{lam1d_output_dir}
-specz_catalog_path = "/data_pde01/work/lizm/packages/catalog_specz_merged.csv"  # reference spec-z catalog
+run_name   = "S25"                                   # run name (e.g. S25A, run26)
+rerun      = "20260804"                              # rerun date tag S25
+lam1d_output_dir = "brn_400_960_output"              # exact LAM1D output directory name, such that: {lam1d_dir}/{run_name}/{rerun}/{lam1d_output_dir}
+specz_catalog_path = "/home/sali/1dval/catalog/catalog_specz_master.csv"  # reference spec-z catalog
 matching_threshold_arcsec = 1.0  # max separation for catalog cross-matching (arcsec)
 z_limit_gal = 0.01               # max |z_lam1d - z_catalog| for GALAXY redshift match
 z_limit_qso = 0.02               # max |z_lam1d - z_catalog| for QSO redshift match
@@ -189,7 +189,7 @@ if all_final_dfs:
             f.write(line + "\n")
     print(f"Summary of {run_tag} statistics saved to {run_tag}_summary_stats.txt")
 
-    def plot_comparison(df, class_name, redshift_col, z_limit, plot_filename):
+    def plot_comparison(df, class_name, redshift_col, z_limit, pdf):
         diff            = df[redshift_col] - df["z"]
         matched         = abs(diff) <= z_limit
         df_matched_plot = df[matched]
@@ -200,13 +200,23 @@ if all_final_dfs:
         n_type    = len(df[df['spectype'].str.upper() == class_name])
         pct_type  = (n_type / n_total) * 100 if n_total > 0 else 0
 
-        plt.scatter(df["z"], df[redshift_col], s=2, color="red", alpha=0.6,
-                    label=f"{class_name} Total No.={n_total}")
-        plt.scatter(df_matched_plot["z"], df_matched_plot[redshift_col], s=2, color="blue", alpha=0.6,
-                    label=(f"{class_name} Redshift Match\nNo.={n_match} ({pct_match:.1f}%)\n|\u0394z| ≤ {z_limit}"))
+        # Restrict to classification-matched objects for redshift plot and stats
+        df_cls    = df[df['spectype'].str.upper() == class_name]
+        diff_cls  = df_cls[redshift_col] - df_cls["z"]
+        matched_cls = abs(diff_cls) <= z_limit
+        n_cls     = len(df_cls)
+        n_match_cls = matched_cls.sum()
+        pct_match_cls = (n_match_cls / n_cls) * 100 if n_cls > 0 else 0
+
+        plt.scatter(df_cls["z"], df_cls[redshift_col], s=2, color="red", alpha=0.6,
+                    label=f"{class_name} Total No.={n_cls}")
+        plt.scatter(df_cls.loc[matched_cls.index[matched_cls], "z"],
+                    df_cls.loc[matched_cls.index[matched_cls], redshift_col],
+                    s=2, color="blue", alpha=0.6,
+                    label=(f"{class_name} Redshift Match\nNo.={n_match_cls} ({pct_match_cls:.1f}%)\n|\u0394z| \u2264 {z_limit}"))
 
         zmin = 0
-        zmax = df["z"].max()
+        zmax = df_cls["z"].max()
         plt.plot([zmin, zmax], [zmin, zmax], "k--", lw=1)
         plt.plot([zmin, zmax], [zmin + z_limit, zmax + z_limit], "k:", lw=1)
         plt.plot([zmin, zmax], [zmin - z_limit, zmax - z_limit], "k:", lw=1)
@@ -225,13 +235,131 @@ if all_final_dfs:
         plt.grid(True)
         plt.legend(loc="upper right")
         plt.tight_layout()
-        plt.savefig(plot_filename, dpi=200)
+        pdf.savefig(dpi=200, bbox_inches='tight')
         plt.clf()
 
-    plot_comparison(df_matched[df_matched['class'].str.upper() == 'GALAXY'], "GALAXY", "redshift_gal", z_limit_gal,
-                    f"{run_tag}_galaxy_lam1d_vs_catalog_specz_comparison.png")
-    plot_comparison(df_matched[df_matched['class'].str.upper() == 'QSO'], "QSO", "redshift_qso", z_limit_qso,
-                    f"{run_tag}_qso_lam1d_vs_catalog_specz_comparison.png")
+    qa_pdf_filename = f"{run_tag}_QA_plots.pdf"
+
+    def plot_dz_vs_mag(df, class_name, redshift_col, z_limit, pdf):
+        """Plot LAM1D-catalog Δz vs r-band magnitude with per-bin success rate at top."""
+        df = df.copy()
+
+        # Restrict to classification-matched objects (same as plot_comparison)
+        df = df[df['spectype'].str.upper() == class_name]
+
+        df['dz']        = pd.to_numeric(df[redshift_col], errors='coerce') - pd.to_numeric(df['z'], errors='coerce')
+        df['mag_r']     = pd.to_numeric(df['mag_r'],     errors='coerce')
+        df['mag_err_r'] = pd.to_numeric(df['mag_err_r'], errors='coerce')
+
+        # Overall stats — all class-matched objects with a valid Δz (before any mag cut)
+        df_dz_valid  = df.dropna(subset=['dz'])
+        n_all        = len(df_dz_valid)
+        n_match_all  = (df_dz_valid['dz'].abs() <= z_limit).sum()
+        pct_all      = (n_match_all / n_all * 100) if n_all > 0 else 0.0
+
+        df = df.dropna(subset=['dz', 'mag_r', 'mag_err_r'])
+        df = df[df['mag_err_r'] < 0.2]
+
+        if df.empty:
+            print(f"  No data with mag_r for {class_name}, skipping mag plot.")
+            return
+
+        matched = df['dz'].abs() <= z_limit
+
+        mag_min = np.floor(df['mag_r'].quantile(0.01))
+        mag_max = np.ceil(df['mag_r'].quantile(0.99))
+
+        # x-axis limits: actual data min/max, clamped to [10, 30]
+        xlim_min = max(np.floor(df['mag_r'].min()), 10)
+        xlim_max = min(np.ceil(df['mag_r'].max()),  30)
+
+        # Bins: lump <15 and >25 into single edge bins, per-mag in between
+        LUMP_LO, LUMP_HI = 15.0, 25.0
+        mid_bins = np.arange(LUMP_LO, LUMP_HI + 1, 1.0)   # [15,16,...,25]
+        # Full bin edges: xlim_min | 15 | 16 | ... | 25 | xlim_max
+        bin_edges = np.concatenate([[xlim_min], mid_bins, [xlim_max]])
+        bin_edges = np.unique(bin_edges)   # remove duplicates if xlim already at boundary
+
+        fig, ax = plt.subplots(figsize=(14, 7))
+
+        unmatch_color = 'red'
+        match_color   = 'steelblue'
+
+        ax.scatter(df.loc[~matched, 'mag_r'], df.loc[~matched, 'dz'],
+                   s=6, alpha=0.6, color=unmatch_color)
+        ax.scatter(df.loc[matched,  'mag_r'], df.loc[matched,  'dz'],
+                   s=6, color=match_color, alpha=0.5)
+
+        ax.axhline(0,        color='black', linestyle='--', linewidth=0.8)
+        ax.axhline(+z_limit, color='gray',  linestyle=':',  linewidth=1.0)
+        ax.axhline(-z_limit, color='gray',  linestyle=':',  linewidth=1.0)
+
+        for i in range(len(bin_edges) - 1):
+            lo, hi  = bin_edges[i], bin_edges[i+1]
+            mid     = (lo + hi) / 2.0
+            in_bin  = (df['mag_r'] >= lo) & (df['mag_r'] < hi)
+            n_bin   = in_bin.sum()
+            n_match = (in_bin & matched).sum()
+            rate    = (n_match / n_bin * 100) if n_bin > 0 else np.nan
+
+            ax.axvline(lo, color='gray', linestyle='--', linewidth=1.8, alpha=0.9)
+
+            if n_bin > 0:
+                label = f"Match={rate:.0f}%\n(N={n_bin})"
+                ax.text(mid, 1.02, label, transform=ax.get_xaxis_transform(),
+                        ha='center', va='bottom', fontsize=7,
+                        bbox=dict(boxstyle='round,pad=0.2', facecolor='lightyellow',
+                                  edgecolor='gray', alpha=0.8))
+
+        ax.axvline(bin_edges[-1], color='gray', linestyle='--', linewidth=1.8, alpha=0.9)
+
+        ax.set_xlabel('r-band magnitude (mag_r)')
+        ax.set_ylabel(f'z_lam1d \u2212 z_catalog (\u0394z)')
+        ax.set_title(f'{class_name}: \u0394z vs r-band magnitude  |  {run_tag}',
+                     pad=40)
+        ax.set_xlim([xlim_min, xlim_max])
+
+        y_abs_max = max(abs(df['dz'].quantile(0.01)), abs(df['dz'].quantile(0.99)), z_limit * 3)
+        ax.set_ylim([-y_abs_max, y_abs_max])
+
+        n_total       = len(df)
+        n_match_total = matched.sum()
+        pct_mag       = (n_match_total / n_total * 100) if n_total > 0 else 0.0
+
+        # --- Bottom-right: combined summary + colour legend ---
+        import matplotlib.lines as mlines
+        import matplotlib.patches as mpatches
+
+        unmatched_total = (~matched).sum()
+        unmatch_dot = mlines.Line2D([], [], color=unmatch_color, marker='o',
+                                    linestyle='None', markersize=5,
+                                    label=f'Unmatched: {unmatched_total:,}')
+        match_dot   = mlines.Line2D([], [], color=match_color, marker='o',
+                                    linestyle='None', markersize=5,
+                                    label=f'Matched (|\u0394z| \u2264 {z_limit}): {n_match_total:,}')
+
+        summary_text = (
+            f'All objects (classification matched): {n_all:,}  |  Match: {pct_all:.1f}%\n'
+            f'Objects with mag_r (mag_err_r<0.2): {n_total:,}  |  Match: {pct_mag:.1f}%'
+        )
+        blank = mpatches.Patch(color='none', label=summary_text)
+
+        ax.legend(handles=[blank, unmatch_dot, match_dot],
+                  loc='lower left', fontsize=8, framealpha=0.9,
+                  handlelength=1.5)
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        pdf.savefig(dpi=200, bbox_inches='tight')
+        plt.clf()
+        plt.close()
+        print(f"  Saved {class_name} dz vs mag to QA PDF")
+
+    with PdfPages(qa_pdf_filename) as pdf_qa:
+        plot_comparison(df_matched[df_matched['class'].str.upper() == 'GALAXY'], "GALAXY", "redshift_gal", z_limit_gal, pdf_qa)
+        plot_comparison(df_matched[df_matched['class'].str.upper() == 'QSO'],    "QSO",    "redshift_qso", z_limit_qso, pdf_qa)
+        plot_dz_vs_mag(df_matched[df_matched['class'].str.upper() == 'GALAXY'],  "GALAXY", "redshift_gal", z_limit_gal, pdf_qa)
+        plot_dz_vs_mag(df_matched[df_matched['class'].str.upper() == 'QSO'],     "QSO",    "redshift_qso", z_limit_qso, pdf_qa)
+    print(f"Saved QA plots to {qa_pdf_filename}")
 
 
 # --- Step 9: Spectrum plots for unmatched objects ---
