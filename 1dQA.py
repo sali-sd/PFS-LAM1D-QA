@@ -33,7 +33,6 @@ repo        = drp2d_dir
 pdf_filename = f"{run_tag}_unmatched_spectra.pdf"
 N_UNMATCHED_SPECTRA = 10
 MEDIAN_FILTER_SIZE  = 1
-
 class_config = [
     ("GALAXY", "redshift_gal", z_limit_gal),
     ("QSO",    "redshift_qso", z_limit_qso),
@@ -42,12 +41,12 @@ class_config = [
 # --- Step 3: Validate Butler repo and collections ---
 print("Validating Butler repo and collections...")
 try:
-    _butler = Butler(repo, collections=collections)
-    _test = list(_butler.registry.queryCollections(collections))
+    butler = Butler(repo, collections=collections)
+    _test = list(butler.registry.queryCollections(collections))
     if not _test:
         raise ValueError(f"Collections '{collections}' not found in repo '{repo}'")
     print(f"Butler validation passed: repo and collections are accessible.\n")
-    del _butler, _test
+    del _test
 except Exception as e:
     raise SystemExit(f"\nButler validation FAILED — stopping execution.\nReason: {e}")
 
@@ -116,19 +115,22 @@ for catid in catids:
         final_df = pd.merge(final_df, best_star_df,   on='targetId', how='inner')
 
         coadd_file = os.path.basename(base_dir.rstrip('/'))
+        obj_group  = int(re.search(rf"{catid}_(\d+)", coadd_file).group(1))
         final_df['coadd_file']  = coadd_file
         final_df['catid']       = catid
-        final_df['obj_group']   = int(re.search(rf"{catid}_(\d+)", coadd_file).group(1))
+        final_df['obj_group']   = obj_group
         final_df['combination'] = combination
 
         all_final_dfs.append(final_df)
 
 
 # --- Step 7: Combine and export ---
-if all_final_dfs:
+have_data = bool(all_final_dfs)
+if have_data:
     combined_df = pd.concat(all_final_dfs, ignore_index=True)
     combined_df['obj_count'] = combined_df.groupby('catid').cumcount() + 1
     combined_df.to_csv(f'{run_tag}_all_lam1d.csv', index=False)
+    del all_final_dfs
 
     print(f"\nCombined file containing all objects from {run_tag} saved as {run_tag}_all_lam1d.csv")
     total_objects = len(combined_df)
@@ -151,9 +153,18 @@ else:
 
 
 # --- Step 8: Catalog matching, summary, and plotting ---
-if all_final_dfs:
-    df_lam1d = pd.read_csv(f"{run_tag}_all_lam1d.csv", low_memory=False)
-    df_specz = pd.read_csv(specz_catalog_path, low_memory=False)
+if have_data:
+    df_lam1d = combined_df
+    del combined_df
+
+    print(f"Loading spec-z catalog from {specz_catalog_path}")
+    header = pd.read_csv(specz_catalog_path, nrows=0)
+    need = {"ra", "dec", "z", "spectype"}
+    if not need.issubset(header.columns):
+        raise SystemExit(f"Spec-z catalog missing required columns: {sorted(need - set(header.columns))}")
+    dtype = {"id": str} if "id" in header.columns else None
+    df_specz = pd.read_csv(specz_catalog_path, dtype=dtype, low_memory=False)
+    print(f"  Spec-z catalog rows: {len(df_specz):,}")
 
     coords_lam1d = SkyCoord(ra=df_lam1d["ra"].values * u.deg, dec=df_lam1d["dec"].values * u.deg)
     coords_specz = SkyCoord(ra=df_specz["ra"].values * u.deg, dec=df_specz["dec"].values * u.deg)
@@ -363,7 +374,7 @@ if all_final_dfs:
 
 
 # --- Step 9: Spectrum plots for unmatched objects ---
-if all_final_dfs:
+if have_data:
 
     def plot_summary(df_all, df_selected, class_name, redshift_col, z_limit, pdf):
         df_class = df_all[df_all['class'].str.upper() == class_name]
