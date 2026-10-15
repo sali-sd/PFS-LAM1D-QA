@@ -33,10 +33,22 @@ repo        = drp2d_dir
 pdf_filename = f"{run_tag}_unmatched_spectra.pdf"
 N_UNMATCHED_SPECTRA = 10
 MEDIAN_FILTER_SIZE  = 1
+DPI = 300
+RASTER_ZORDER = 100  # above every artist, so points, lines, guides, and text are bitmaps
 class_config = [
     ("GALAXY", "redshift_gal", z_limit_gal),
     ("QSO",    "redshift_qso", z_limit_qso),
 ]
+
+
+def rasterize_figure(fig=None):
+    """Rasterize every artist on the figure into the PDF bitmap."""
+    fig = fig or plt.gcf()
+    for ax in fig.axes:
+        ax.set_rasterization_zorder(RASTER_ZORDER)
+    for artist in (*fig.texts, *fig.legends):
+        artist.set_rasterized(True)
+
 
 # --- Step 3: Validate Butler repo and collections ---
 print("Validating Butler repo and collections...")
@@ -246,7 +258,8 @@ if have_data:
         plt.grid(True)
         plt.legend(loc="upper right")
         plt.tight_layout()
-        pdf.savefig(dpi=200, bbox_inches='tight')
+        rasterize_figure()
+        pdf.savefig(dpi=DPI, bbox_inches='tight')
         plt.clf()
 
     qa_pdf_filename = f"{run_tag}_QA_plots.pdf"
@@ -360,7 +373,8 @@ if have_data:
                   handlelength=1.5)
         ax.grid(True, alpha=0.3)
         plt.tight_layout()
-        pdf.savefig(dpi=200, bbox_inches='tight')
+        rasterize_figure()
+        pdf.savefig(dpi=DPI, bbox_inches='tight')
         plt.clf()
         plt.close()
         print(f"  Saved {class_name} dz vs mag to QA PDF")
@@ -422,7 +436,8 @@ if have_data:
         plt.grid(True)
         plt.legend(loc="upper right")
         plt.tight_layout()
-        pdf.savefig(dpi=200, bbox_inches='tight')
+        rasterize_figure()
+        pdf.savefig(dpi=DPI, bbox_inches='tight')
         plt.close()
 
     def plot_spectrum(row, butler, class_name, redshift_col, pdf):
@@ -551,7 +566,8 @@ if have_data:
             else:
                 ax.set_visible(False)
 
-        pdf.savefig(dpi=200, bbox_inches='tight')
+        rasterize_figure()
+        pdf.savefig(dpi=DPI, bbox_inches='tight')
         plt.close()
 
     butler = Butler(repo, collections=collections)
