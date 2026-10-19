@@ -117,9 +117,9 @@ for catid in catids:
         target_cls_df = pd.merge(target_cls_df, warnings_df,   on='targetId', how='inner')
         target_cls_df = pd.merge(target_cls_df, errors_df,     on='targetId', how='inner')
 
-        best_galaxy_df = galaxy_df.sort_values('redshiftProba_gal', ascending=False).drop_duplicates('targetId')
-        best_qso_df    = qso_df.sort_values('redshiftProba_qso',    ascending=False).drop_duplicates('targetId')
-        best_star_df   = star_df.drop_duplicates('targetId')
+        best_galaxy_df = galaxy_df.sort_values('cRank_gal',  kind='stable').drop_duplicates('targetId')
+        best_qso_df    = qso_df.sort_values('cRank_qso',     kind='stable').drop_duplicates('targetId')
+        best_star_df   = star_df.sort_values('cRank_star',   kind='stable').drop_duplicates('targetId')
 
         final_df = target_cls_df
         final_df = pd.merge(final_df, best_galaxy_df, on='targetId', how='inner')
